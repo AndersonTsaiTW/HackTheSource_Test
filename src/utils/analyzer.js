@@ -1,0 +1,117 @@
+/**
+ * Generate risk assessment and recommendations from analysis results
+ */
+export function generateResponse({ parsed, urlResult, phoneResult, aiResult }) {
+  const evidence = [];
+  let riskLevel = 'green'; // green, yellow, red
+  let riskScore = 0;
+
+  // Analyze URL riskRL risk
+  if (urlResult) {
+    if (!urlResult.isSafe) {
+      evidence.push(`⚠️ URL flagged by Google as ${getThreatTypeName(urlResult.threatType)}`);
+      riskScore += 40;
+    } else if (!urlResult.error) {
+      evidence.push('✅ URL not flagged as malicious');
+    }
+  }
+
+  // Analyze phone risk
+  if (phoneResult) {
+    if (phoneResult.lineType === 'voip') {
+      evidence.push('⚠️ Phone is VoIP, commonly used in scams');
+      riskScore += 30;
+    } else if (phoneResult.valid) {
+      evidence.push(`✅ Phone number is valid (${phoneResult.carrier || 'Unknown carrier'})`);
+    } else {
+      evidence.push('⚠️ Phone number is invalid or cannot be verified');
+      riskScore += 20;
+    }
+  }
+
+  // Analyze AI determination
+  if (aiResult) {
+    if (aiResult.isScam) {
+      evidence.push(`🤖 AI determined as scam (confidence: ${aiResult.confidence}%)`);
+      evidence.push(`   Reason: ${aiResult.reason}`);
+      riskScore += aiResult.confidence * 0.3;
+    } else {
+      evidence.push(`🤖 AI determined as legitimate (confidence: ${100 - aiResult.confidence}%)`);
+    }
+
+    if (aiResult.keywords && aiResult.keywords.length > 0) {
+      evidence.push(`   Keywords: ${aiResult.keywords.join(', ')}`);
+    }
+  }
+
+  // Determine risk leveline risk level
+  if (riskScore >= 60) {
+    riskLevel = 'red';
+  } else if (riskScore >= 30) {
+    riskLevel = 'yellow';
+  }
+
+  // Generate action suggestions
+  const action = getActionSuggestion(riskLevel, parsed);
+
+  return {
+    riskLevel,
+    riskScore: Math.min(Math.round(riskScore), 100),
+    evidence,
+    action,
+    parsed: {
+      url: parsed.url,
+      phone: parsed.phone,
+      content: parsed.content.substring(0, 100) + (parsed.content.length > 100 ? '...' : ''),
+    },
+    details: {
+      url: urlResult,
+      phone: phoneResult,
+      ai: aiResult,
+    },
+  };
+}
+
+function getThreatTypeName(threatType) {
+  const types = {
+    'MALWARE': 'Malware',
+    'SOCIAL_ENGINEERING': 'Phishing',
+    'UNWANTED_SOFTWARE': 'Unwanted Software',
+    'POTENTIALLY_HARMFUL_APPLICATION': 'Potentially Harmful Application',
+  };
+  return types[threatType] || threatType;
+}
+
+function getActionSuggestion(riskLevel, parsed) {
+  switch (riskLevel) {
+    case 'red':
+      return {
+        title: '🚨 High Risk Warning',
+        suggestions: [
+          'Do not click any links',
+          'Do not call back the phone number',
+          'Block this number immediately',
+          'Report to 165 anti-fraud hotline',
+        ],
+      };
+    case 'yellow':
+      return {
+        title: '⚠️ Handle with Caution',
+        suggestions: [
+          'Verify through official channels first',
+          'Do not provide personal information',
+          parsed.url ? 'Avoid clicking suspicious links' : null,
+          'Call 165 if you have doubts',
+        ].filter(Boolean),
+      };
+    default:
+      return {
+        title: '✅ Appears Safe',
+        suggestions: [
+          'No obvious scam features detected',
+          'However, remain vigilant',
+          'Do not easily provide personal information',
+        ],
+      };
+  }
+}
