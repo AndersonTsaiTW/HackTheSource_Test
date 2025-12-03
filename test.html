@@ -3,57 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scam Detection API Test</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-        }
-        textarea {
-            width: 100%;
-            height: 150px;
-            margin: 10px 0;
-            padding: 10px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 15px 32px;
-            font-size: 16px;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #result {
-            margin-top: 20px;
-            padding: 20px;
-            border-radius: 5px;
-        }
-        .red { background-color: #ffebee; border-left: 5px solid #f44336; }
-        .yellow { background-color: #fff9c4; border-left: 5px solid #ff9800; }
-        .green { background-color: #e8f5e9; border-left: 5px solid #4caf50; }
-    </style>
+    <title>Scam Detection System</title>
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-    <h1>🛡️ Scam Message Detection API Test</h1>
-    
-    <label for="message"><strong>Enter suspicious message:</strong></label>
-    <textarea id="message" placeholder="Paste your message here...">URGENT! Your package is waiting. Click http://suspicious-site.com to claim. Contact: 0912345678</textarea>
-    
-    <button onclick="analyzeMessage()">🔍 Analyze Message</button>
-    
-    <div id="result"></div>
+    <div id="bubble-bg" aria-hidden="true"></div>
+    <div class="bg-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode" role="button" aria-pressed="false">
+        <span class="theme-toggle-icon" aria-hidden="true"></span>
+        <span id="theme-label" class="sr-only">Toggle color theme</span>
+    </div>
+    <div class="container">
+        <div class="header">
+            <div class="header-badge">Advanced Threat Detection</div>
+            <h1>Scam Detection System</h1>
+            <p>AI-powered analysis for suspicious messages and images</p>
+        </div>
+
+        <div class="card">
+            <div class="toggle-container">
+                <button class="toggle-btn active" onclick="switchMode('text')">Text Analysis</button>
+                <button class="toggle-btn" onclick="switchMode('image')">Image Analysis</button>
+            </div>
+
+            <div id="text-section" class="input-section active">
+                <div class="form-group">
+                    <label for="message">Enter suspicious message</label>
+                    <textarea id="message" placeholder="Paste your message here...">URGENT! Your package is waiting. Click http://suspicious-site.com to claim. Contact: 0912345678</textarea>
+                </div>
+                <button class="analyze-btn" onclick="analyzeMessage()">Analyze Message</button>
+            </div>
+
+            <div id="image-section" class="input-section">
+                <div class="form-group">
+                    <label for="imageFile">Upload image</label>
+                    <div class="file-input-wrapper">
+                        <label for="imageFile" class="file-input-label" id="dropZone">
+                            <div>
+                                <div class="file-input-text">
+                                    Click to upload or drag and drop
+                                    <small>JPG, PNG, GIF, WebP, TIFF (max 10MB)</small>
+                                </div>
+                                <div class="file-name" id="fileName"></div>
+                            </div>
+                        </label>
+                        <input type="file" id="imageFile" accept="image/*">
+                    </div>
+                </div>
+                <button class="analyze-btn" onclick="analyzeImage()">Extract and Analyze</button>
+            </div>
+
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <!-- Back to top button (appears after scrolling past one viewport) -->
+    <button id="back-to-top" aria-label="Back to top" title="Back to top" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+            <line x1="12" y1="19" x2="12" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline points="5 12 12 5 19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+        </svg>
+    </button>
+
+    <script src="scripts/bubbles.js" defer></script>
 
     <script>
+        // Helper: set theme icon (sun for light, moon for dark)
+        function setThemeIcon(isLight) {
+            const icon = document.querySelector('.theme-toggle-icon');
+            if (!icon) return;
+            if (isLight) {
+                // Sun icon
+                icon.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                        <circle cx="12" cy="12" r="4" fill="currentColor" />
+                        <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="12" y1="2" x2="12" y2="5" />
+                            <line x1="12" y1="19" x2="12" y2="22" />
+                            <line x1="2" y1="12" x2="5" y2="12" />
+                            <line x1="19" y1="12" x2="22" y2="12" />
+                            <line x1="4.2" y1="4.2" x2="6.3" y2="6.3" />
+                            <line x1="17.7" y1="17.7" x2="19.8" y2="19.8" />
+                            <line x1="17.7" y1="6.3" x2="19.8" y2="4.2" />
+                            <line x1="4.2" y1="19.8" x2="6.3" y2="17.7" />
+                        </g>
+                    </svg>`;
+                icon.style.color = '';
+            } else {
+                // Moon icon
+                icon.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                        <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="currentColor" />
+                    </svg>`;
+                icon.style.color = '';
+            }
+        }
+
+        // Initialize theme from localStorage
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-mode');
+            setThemeIcon(true);
+            document.querySelector('.theme-toggle').setAttribute('aria-pressed', 'true');
+        } else {
+            document.body.classList.remove('light-mode');
+            setThemeIcon(false);
+            document.querySelector('.theme-toggle').setAttribute('aria-pressed', 'false');
+        }
+
+        function toggleTheme() {
+            const willBeLight = !document.body.classList.contains('light-mode');
+            if (willBeLight) {
+                document.body.classList.add('light-mode');
+                setThemeIcon(true);
+                localStorage.setItem('theme', 'light');
+                document.querySelector('.theme-toggle').setAttribute('aria-pressed', 'true');
+            } else {
+                document.body.classList.remove('light-mode');
+                setThemeIcon(false);
+                localStorage.setItem('theme', 'dark');
+                document.querySelector('.theme-toggle').setAttribute('aria-pressed', 'false');
+            }
+        }
+
+        function switchMode(mode) {
+            const textSection = document.getElementById('text-section');
+            const imageSection = document.getElementById('image-section');
+            const buttons = document.querySelectorAll('.toggle-btn');
+            
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            if (mode === 'text') {
+                textSection.classList.add('active');
+                imageSection.classList.remove('active');
+                buttons[0].classList.add('active');
+            } else {
+                textSection.classList.remove('active');
+                imageSection.classList.add('active');
+                buttons[1].classList.add('active');
+            }
+            
+            document.getElementById('result').classList.remove('show');
+        }
+
+        const dropZone = document.getElementById('dropZone');
+        const imageFile = document.getElementById('imageFile');
+        const fileName = document.getElementById('fileName');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            imageFile.files = files;
+            updateFileName(files[0]);
+        }, false);
+
+        imageFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                updateFileName(e.target.files[0]);
+            }
+        });
+
+        function updateFileName(file) {
+            if (file) {
+                fileName.textContent = file.name + ' (' + (file.size / 1024).toFixed(2) + ' KB)';
+                fileName.style.display = 'block';
+            } else {
+                fileName.style.display = 'none';
+            }
+        }
+
         async function analyzeMessage() {
             const message = document.getElementById('message').value;
             const resultDiv = document.getElementById('result');
             
-            resultDiv.innerHTML = '<p>⏳ Analyzing...</p>';
+            if (!message.trim()) {
+                resultDiv.innerHTML = '<div class="error">Please enter a message to analyze</div>';
+                resultDiv.classList.add('show');
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading">Analyzing message...</div>';
+            resultDiv.classList.add('show');
             
             try {
                 const response = await fetch('http://localhost:3000/api/analyze', {
@@ -66,25 +222,157 @@
                 
                 const data = await response.json();
                 
-                resultDiv.className = data.riskLevel;
-                resultDiv.innerHTML = `
-                    <h2>${data.action.title}</h2>
-                    <p><strong>Risk Score:</strong> ${data.riskScore}/100</p>
-                    
-                    <h3>📋 Evidence:</h3>
-                    <ul>
-                        ${data.evidence.map(e => `<li>${e}</li>`).join('')}
-                    </ul>
-                    
-                    <h3>💡 Recommendations:</h3>
-                    <ul>
-                        ${data.action.suggestions.map(s => `<li>${s}</li>`).join('')}
-                    </ul>
-                `;
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                } else {
+                    const riskClass = getRiskClass(data.riskLevel);
+                    resultDiv.innerHTML = `
+                        <div class="result-card ${riskClass}">
+                            <div class="result-title">${getStatusTitle(data.riskLevel)}</div>
+                            <div class="risk-score-container">
+                                <span class="risk-score">${data.riskScore}</span><span class="risk-label">/ 100</span>
+                            </div>
+                            
+                            <div class="result-section">
+                                <h3>Analysis Evidence</h3>
+                                <ul class="result-list">
+                                    ${data.evidence.map(e => `<li>${e}</li>`).join('')}
+                                </ul>
+                            </div>
+                            
+                            <div class="result-section">
+                                <h3>Recommendations</h3>
+                                <ul class="result-list">
+                                    ${data.action.suggestions.map(s => `<li>${s}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }
             } catch (error) {
-                resultDiv.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
             }
         }
+
+        async function analyzeImage() {
+            const fileInput = document.getElementById('imageFile');
+            const resultDiv = document.getElementById('result');
+            
+            if (!fileInput.files.length) {
+                resultDiv.innerHTML = '<div class="error">Please select an image file</div>';
+                resultDiv.classList.add('show');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+            
+            resultDiv.innerHTML = '<div class="loading">Extracting text and analyzing image...</div>';
+            resultDiv.classList.add('show');
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                } else {
+                    const riskClass = getRiskClass(data.riskLevel);
+                    resultDiv.innerHTML = `
+                        <div class="result-card ${riskClass}">
+                            <div class="result-section">
+                                <h3>Extracted Text</h3>
+                                <div class="extracted-text">${escapeHtml(data.text)}</div>
+                            </div>
+                            
+                            <div style="margin-top: 16px;">
+                                <div class="result-title">${getStatusTitle(data.riskLevel)}</div>
+                                <div class="risk-score-container">
+                                    <span class="risk-score">${data.riskScore}</span><span class="risk-label">/ 100</span>
+                                </div>
+                            </div>
+                            
+                            <div class="result-section">
+                                <h3>Analysis Evidence</h3>
+                                <ul class="result-list">
+                                    ${data.evidence.map(e => `<li>${e}</li>`).join('')}
+                                </ul>
+                            </div>
+                            
+                            <div class="result-section">
+                                <h3>Recommendations</h3>
+                                <ul class="result-list">
+                                    ${data.action.suggestions.map(s => `<li>${s}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function getRiskClass(riskLevel) {
+            if (riskLevel === 'red') return 'high-risk';
+            if (riskLevel === 'yellow') return 'medium-risk';
+            return 'low-risk';
+        }
+
+        function getStatusTitle(riskLevel) {
+            if (riskLevel === 'red') return 'High Risk Detected';
+            if (riskLevel === 'yellow') return 'Medium Risk Detected';
+            return 'Low Risk';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+                setThemeIcon(true);
+                document.querySelector('.theme-toggle').setAttribute('aria-pressed', 'true');
+            } else {
+                document.body.classList.remove('light-mode');
+                setThemeIcon(false);
+                document.querySelector('.theme-toggle').setAttribute('aria-pressed', 'false');
+            }
+            // Back-to-top behavior: show when scrolled beyond one viewport height
+            const backBtn = document.getElementById('back-to-top');
+            if (backBtn) {
+                function updateBackBtn() {
+                    const scrolled = window.scrollY || document.documentElement.scrollTop;
+                    const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+                    // show immediately when user scrolls, but only if page is taller than viewport
+                    if (docHeight > window.innerHeight && scrolled > 0) backBtn.classList.add('visible');
+                    else backBtn.classList.remove('visible');
+                }
+
+                // show/hide on load/scroll/resize
+                updateBackBtn();
+                window.addEventListener('scroll', updateBackBtn, { passive: true });
+                window.addEventListener('resize', updateBackBtn);
+
+                // click and keyboard activation
+                backBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+                backBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        backBtn.click();
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>

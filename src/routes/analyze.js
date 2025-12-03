@@ -1,11 +1,28 @@
 import express from 'express';
+import multer from 'multer';
 import { parseMessage } from '../services/parser.js';
 import { checkUrlSafety } from '../services/safeBrowsing.js';
 import { lookupPhone } from '../services/twilioLookup.js';
 import { analyzeWithOpenAI } from '../services/openaiCheck.js';
 import { generateResponse } from '../utils/analyzer.js';
+import { extractTextFromImage } from '../services/ocrService.js';
 
 const router = express.Router();
+
+// Configure Multer for OCR endpoint
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/tiff'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images are allowed.'));
+    }
+  }
+});
 
 router.post('/analyze', async (req, res) => {
   try {
@@ -39,6 +56,58 @@ router.post('/analyze', async (req, res) => {
     console.error('❌ Analysis error:', error);
     res.status(500).json({ 
       error: 'Analysis failed', 
+      message: error.message 
+    });
+  }
+});
+
+// OCR endpoint: Extract text from image and analyze for scams
+router.post('/ocr', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Image file is required' });
+    }
+
+    console.log('📸 Received image:', req.file.originalname, `(${req.file.size} bytes)`);
+
+    // 1. Extract text from image using OCR
+    const extractedText = await extractTextFromImage(req.file.buffer);
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      return res.status(400).json({ error: 'No text could be extracted from the image' });
+    }
+
+    console.log('📄 Text extracted:', extractedText.substring(0, 100) + '...');
+
+    // 2. Parse extracted text to find URLs and phone numbers
+    const parsed = parseMessage(extractedText);
+
+    // 3. Call analysis APIs in parallel
+    const [urlResult, phoneResult, aiResult] = await Promise.all([
+      parsed.url ? checkUrlSafety(parsed.url) : Promise.resolve(null),
+      parsed.phone ? lookupPhone(parsed.phone) : Promise.resolve(null),
+      analyzeWithOpenAI(parsed.content),
+    ]);
+
+    // 4. Generate response with OCR results
+    const analysisResult = generateResponse({
+      parsed,
+      urlResult,
+      phoneResult,
+      aiResult,
+    });
+
+    res.json({
+      text: extractedText,
+      riskScore: analysisResult.riskScore,
+      riskLevel: analysisResult.riskLevel,
+      evidence: analysisResult.evidence,
+      action: analysisResult.action,
+    });
+  } catch (error) {
+    console.error('❌ OCR analysis error:', error);
+    res.status(500).json({ 
+      error: 'OCR analysis failed', 
       message: error.message 
     });
   }
