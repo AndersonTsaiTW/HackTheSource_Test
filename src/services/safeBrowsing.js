@@ -31,16 +31,13 @@ export async function checkUrlSafety(url) {
     };
 
     const response = await axios.post(endpoint, requestBody);
-    
-    if (response.data.matches && response.data.matches.length > 0) {
-      return {
-        isSafe: false,
-        threatType: response.data.matches[0].threatType,
-        platform: response.data.matches[0].platformType,
-      };
-    }
 
-    return { isSafe: true, threatType: null };
+    return {
+      raw: response.data,
+      isSafe: !response.data.matches || response.data.matches.length === 0,
+      threats: response.data.matches || []
+    };
+    
   } catch (error) {
     console.error('❌ Safe Browsing API error:', error.message);
     return { isSafe: true, threatType: null, error: error.message };

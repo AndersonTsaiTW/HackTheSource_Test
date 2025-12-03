@@ -27,13 +27,7 @@ export async function lookupPhone(phone) {
       },
     });
 
-    return {
-      valid: response.data.valid,
-      phoneNumber: response.data.phone_number,
-      countryCode: response.data.country_code,
-      carrier: response.data.carrier?.name || null,
-      lineType: response.data.line_type_intelligence?.type || null, // mobile, landline, voip
-    };
+    return response.data;
   } catch (error) {
     console.error('❌ Twilio Lookup API error:', error.message);
     return { valid: false, carrier: null, error: error.message };
