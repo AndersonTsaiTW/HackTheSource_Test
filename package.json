@@ -15,7 +15,7 @@
     "api"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "axios": "^1.6.2",
     "cors": "^2.8.5",

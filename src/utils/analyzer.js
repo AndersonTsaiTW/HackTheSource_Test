@@ -32,11 +32,12 @@ export function generateResponse({ parsed, urlResult, phoneResult, aiResult }) {
   // Analyze AI determination
   if (aiResult) {
     if (aiResult.isScam) {
-      evidence.push(`🤖 AI determined as scam (confidence: ${aiResult.confidence}%)`);
+      // Don't show confidence percentage in evidence
+      evidence.push(`🤖 AI Analysis: Likely Scam`);
       evidence.push(`   Reason: ${aiResult.reason}`);
-      riskScore += aiResult.confidence * 0.3;
+      riskScore += aiResult.confidence * 0.7;
     } else {
-      evidence.push(`🤖 AI determined as legitimate (confidence: ${100 - aiResult.confidence}%)`);
+      evidence.push(`🤖 AI Analysis: Considered Legitimate`);
     }
 
     if (aiResult.keywords && aiResult.keywords.length > 0) {
@@ -56,7 +57,7 @@ export function generateResponse({ parsed, urlResult, phoneResult, aiResult }) {
 
   return {
     riskLevel,
-    riskScore: Math.min(Math.round(riskScore), 100),
+    riskScore: Math.min(Math.round(riskScore), 99),
     evidence,
     action,
     parsed: {
