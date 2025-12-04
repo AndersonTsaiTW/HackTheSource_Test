@@ -1,15 +1,33 @@
 # Scam Message Detection
 
-Hackathon Project - Scam message detection built with Node.js + Express  
+Hackathon Project - AI-powered scam detection system with frontend + backend + machine learning training pipeline
+
 Introduction Document: [Lumos - Clarity_in_Digital_Trust](https://github.com/AndersonTsaiTW/HackTheSource_lumos/blob/main/Lumos_Clarity_in_Digital_Trust.pdf)
+
 ## Features
 
+### Production API (For End Users)
+
 - 📝 **Smart Parsing**: Extract URLs, phone numbers, and content from messages using Regex
-- 🌐 **URL Detection**: Integrate Google Safe Browsing API to check malicious links
-- 📞 **Phone Lookup**: Verify phone numbers using Twilio Lookup API
-- 🤖 **AI Analysis**: OpenAI GPT-4 intelligent scam detection
+- 🌐 **URL Detection**: Google Safe Browsing API to detect malicious links
+- 📞 **Phone Lookup**: Twilio Lookup API to verify phone numbers and detect VoIP
+- 🤖 **AI Analysis**: OpenAI GPT-4o-mini with 12 semantic features (urgency, threat level, impersonation type, etc.)
+- 📸 **OCR Support**: Tesseract.js for extracting text from scam message images
 - ⚡ **Parallel Processing**: Call three APIs simultaneously for fast response
-- 🎨 **Risk Assessment**: Red warning, yellow caution, green safe
+- 🎨 **Risk Assessment**: Red warning (≥60), yellow caution (≥30), green safe (<30)
+- 🌐 **Web Interface**: Modern responsive UI with dark/light mode
+
+### Training Data Collection (For ML Model)
+
+- 🎯 **45 Feature Extraction**: Comprehensive feature engineering for XGBoost training
+  - Text features (14): character count, word count, digit ratio, special chars, etc.
+  - URL features (8): URL count, suspicious domains, HTTPS ratio, etc.
+  - Phone features (7): phone count, VoIP detection, international format, etc.
+  - AI features (12): urgency level, threat level, temptation level, impersonation type, emotion triggers, etc.
+  - Statistical features (3): entropy, readability, complexity
+- 📊 **CSV Export**: Automated training data generation to `training_data.csv`
+- 🖼️ **Batch Processing**: Process 100+ images from `data_pics/fraud` and `data_pics/normal` folders
+- 🔄 **API Integration**: Reuses production APIs (Google, Twilio, OpenAI) for consistent feature extraction
 
 ## Quick Start
 
@@ -51,7 +69,9 @@ Server will run on `http://localhost:3000`
 
 ## API Documentation
 
-### POST /api/analyze
+### Production Endpoints
+
+#### POST /api/analyze
 
 Analyze suspicious messages
 
@@ -72,48 +92,209 @@ Analyze suspicious messages
   "evidence": [
     "⚠️ URL flagged by Google as Phishing",
     "⚠️ Phone is VoIP, commonly used in scams",
-    "🤖 AI determined as scam (confidence: 92%)"
+    "🤖 AI detected scam indicators",
+    "   Reason: Contains urgency keywords and suspicious link"
   ],
   "action": {
     "title": "🚨 High Risk Warning",
     "suggestions": [
       "Do not click any links",
       "Do not call back the phone number",
-      "Block this number immediately"
+      "Block this number immediately",
+      "Report to 165 anti-fraud hotline"
     ]
+  },
+  "parsed": {
+    "url": "http://suspicious-link.com",
+    "phone": "0912345678",
+    "content": "Your package has arrived, please click..."
   }
+}
+```
+
+#### POST /api/ocr
+
+Extract text from image and analyze for scams
+
+**Request:**
+
+- Method: POST
+- Content-Type: multipart/form-data
+- Body: `image` file (JPG, PNG, GIF, WebP, TIFF, max 10MB)
+
+**Response:**
+
+```json
+{
+  "text": "Extracted text from image...",
+  "riskScore": 85,
+  "riskLevel": "red",
+  "evidence": [...],
+  "action": {...}
+}
+```
+
+### Training Endpoints
+
+#### POST /api/training/collect-training-data
+
+Collect training data with 45 features for ML model
+
+**Request Body:**
+
+```json
+{
+  "image_path": "data_pics/fraud/scam_001.png",
+  "ocr_text": "URGENT! Click http://phishing.com",
+  "label": 1
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Training data collected successfully",
+  "features": {
+    "char_count": 156,
+    "word_count": 23,
+    "url_count": 1,
+    "phone_count": 1,
+    "urgency_level": 8,
+    "threat_level": 7
+  },
+  "label": 1
+}
+```
+
+#### GET /api/training/training-stats
+
+Get statistics about collected training data
+
+**Response:**
+
+```json
+{
+  "totalRows": 128,
+  "features": 45,
+  "lastUpdated": "2025-12-04T10:30:00.000Z"
 }
 ```
 
 ## Project Structure
 
-```
-src/
-├── index.js              # Express application entry
-├── config.js             # Environment variables configuration
-├── routes/
-│   └── analyze.js        # Analysis route
-├── services/
-│   ├── parser.js         # Message parsing
-│   ├── safeBrowsing.js   # Google Safe Browsing
-│   ├── twilioLookup.js   # Twilio phone lookup
-│   └── openaiCheck.js    # OpenAI scam analysis
-└── utils/
-    └── analyzer.js       # Risk assessment logic
+```text
+.
+├── src/                          # Production code
+│   ├── index.js                  # Main server (unified)
+│   ├── config.js                 # Environment variables
+│   ├── routes/
+│   │   └── analyze.js            # /api/analyze, /api/ocr
+│   ├── services/
+│   │   ├── parser.js             # Message parsing (URL, phone)
+│   │   ├── safeBrowsing.js       # Google Safe Browsing API
+│   │   ├── twilioLookup.js       # Twilio Lookup API
+│   │   ├── openaiCheck.js        # OpenAI GPT-4o-mini (12 features)
+│   │   └── ocrService.js         # Tesseract.js OCR
+│   └── utils/
+│       └── analyzer.js           # Risk score calculation
+│
+├── training/                     # ML training pipeline
+│   ├── routes/
+│   │   └── collectData.js        # /api/training/*
+│   ├── services/
+│   │   └── featureExtractor.js   # 45 feature extraction
+│   ├── utils/
+│   │   └── csvWriter.js          # CSV file management
+│   └── scripts/
+│       ├── test-collect.js       # Test single sample
+│       └── scan-images.js        # Batch process images
+│
+├── data_pics/                    # Training images
+│   ├── fraud/                    # 85 scam images
+│   └── normal/                   # 43 normal images
+│
+├── test.html                     # Web UI
+├── styles/                       # CSS files
+├── scripts/                      # Frontend JS
+└── training_data.csv             # Generated training data
 ```
 
 ## Tech Stack
 
+- **Runtime**: Node.js v22.13.0
 - **Framework**: Express.js
 - **HTTP Client**: Axios
-- **AI**: OpenAI GPT-4
+- **AI**: OpenAI GPT-4o-mini
+- **OCR**: Tesseract.js
 - **APIs**: Google Safe Browsing v4, Twilio Lookup v2
+- **Frontend**: Vanilla HTML/CSS/JS with dark mode
+
+## Training Data Collection
+
+### How to Collect Training Data
+
+1. **Prepare images**: Place images in `data_pics/fraud/` (label=1) or `data_pics/normal/` (label=0)
+
+2. **Start server**:
+
+```bash
+npm run dev
+```
+
+3. **Run batch processing** (in another terminal):
+
+```bash
+node training/scripts/scan-images.js
+```
+
+This will:
+
+- Scan all images in `data_pics/fraud/` and `data_pics/normal/`
+- Extract text using OCR
+- Call Google, Twilio, and OpenAI APIs
+- Extract 45 features
+- Append to `training_data.csv`
+
+### Feature List (45 Total)
+
+**Text Features (14)**:
+
+- char_count, word_count, digit_count, digit_ratio
+- uppercase_ratio, special_char_count, exclamation_count
+- question_count, has_urgent_keywords, suspicious_word_count
+- max_word_length, avg_word_length, emoji_count, consecutive_caps
+
+**URL Features (8)**:
+
+- url_count, has_suspicious_tld, has_ip_address
+- has_url_shortener, avg_url_length, has_https
+- url_path_depth, subdomain_count
+
+**Phone Features (7)**:
+
+- phone_count, has_intl_code, is_voip
+- is_mobile, is_valid_phone, phone_carrier_known, has_multiple_phones
+
+**AI Features (12)**:
+
+- urgency_level (0-10), threat_level (0-10), temptation_level (0-10)
+- impersonation_type, action_requested, grammar_quality (0-10)
+- emotion_triggers, credibility_score (0-10)
+- ai_is_scam (0/1), ai_confidence (0-100), has_scam_keywords, keyword_count
+
+**Statistical Features (3)**:
+
+- text_entropy, readability_score, sentence_complexity
 
 ## Development Tips
 
 - Use `nodemon` for development with auto-restart on file changes
 - Keep API Keys secure, do not commit to Git
-- Test API with Postman or curl
+- Test API with Postman, curl, or the web interface (`test.html`)
+- Training data is saved to `training_data.csv` (gitignored)
+- Each API call costs money - be mindful when batch processing
 
 ## License
 
