@@ -8,6 +8,7 @@ import { generateResponse } from '../utils/analyzer.js';
 import { extractTextFromImage } from '../services/ocrService.js';
 import { predictScamProbability } from '../services/xgboostService.js';
 import { extractFeaturesForML } from '../services/featureExtractor.js';
+import { generateExplainedReport } from '../services/aiExplainer.js';
 
 const router = express.Router();
 
@@ -57,16 +58,20 @@ router.post('/analyze', async (req, res) => {
       console.log('⚠️ XGBoost not available, using rule-based scoring only');
     }
 
-    // 5. Generate comprehensive response (hybrid scoring)
-    const response = generateResponse({
+    // 5. Use AI to generate human-readable explanation
+    const explainedReport = await generateExplainedReport({
+      messageText: message,
       parsed,
+      mlResult: xgboostResult,
       urlResult,
       phoneResult,
       aiResult,
-      xgboostResult,
+      topScamFactors: xgboostResult?.topScamFactors || [],
     });
 
-    res.json(response);
+    console.log('✨ Generated explained report with AI');
+
+    res.json(explainedReport);
   } catch (error) {
     console.error('❌ Analysis error:', error);
     res.status(500).json({ 
@@ -110,22 +115,20 @@ router.post('/ocr', upload.single('image'), async (req, res) => {
     // 5. Call XGBoost ML model
     const xgboostResult = await predictScamProbability(features);
 
-    // 6. Generate response with OCR results
-    const analysisResult = generateResponse({
+    // 6. Use AI to generate human-readable explanation
+    const explainedReport = await generateExplainedReport({
+      messageText: extractedText,
       parsed,
+      mlResult: xgboostResult,
       urlResult,
       phoneResult,
       aiResult,
-      xgboostResult,
+      topScamFactors: xgboostResult?.topScamFactors || [],
     });
 
     res.json({
       text: extractedText,
-      riskScore: analysisResult.riskScore,
-      riskLevel: analysisResult.riskLevel,
-      mlScore: analysisResult.mlScore,
-      evidence: analysisResult.evidence,
-      action: analysisResult.action,
+      ...explainedReport,
     });
   } catch (error) {
     console.error('❌ OCR analysis error:', error);
