@@ -35,7 +35,7 @@ export function generateResponse({ parsed, urlResult, phoneResult, aiResult }) {
       // Don't show confidence percentage in evidence
       evidence.push(`🤖 AI Analysis: Likely Scam`);
       evidence.push(`   Reason: ${aiResult.reason}`);
-      riskScore += aiResult.confidence * 0.7;
+      riskScore += aiResult.confidence * 0.99;
     } else {
       evidence.push(`🤖 AI Analysis: Considered Legitimate`);
     }
