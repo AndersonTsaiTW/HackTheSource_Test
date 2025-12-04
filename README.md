@@ -14,8 +14,9 @@ Introduction Document: [Lumos - Clarity_in_Digital_Trust](https://github.com/And
 - 🤖 **AI Analysis**: OpenAI GPT-4o-mini with 12 semantic features (urgency, threat level, impersonation type, etc.)
 - 📸 **OCR Support**: Tesseract.js for extracting text from scam message images
 - ⚡ **Parallel Processing**: Call three APIs simultaneously for fast response
-- 🎨 **Risk Assessment**: Red warning (≥60), yellow caution (≥30), green safe (<30)
+- 🎨 **Risk Assessment**: Red warning (≥75), yellow caution (≥30), green safe (<30)
 - 🌐 **Web Interface**: Modern responsive UI with dark/light mode
+- 🤖 **ML Integration**: XGBoost model with 78.3% accuracy for enhanced scam detection
 
 ### XGBoost ML Model (Machine Learning)
 
@@ -40,7 +41,13 @@ Introduction Document: [Lumos - Clarity_in_Digital_Trust](https://github.com/And
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
+
+- **Node.js**: v22.13.0 or higher
+- **Python**: 3.10 - 3.12 (for ML model, Python 3.13 may have compatibility issues)
+- **npm**: Comes with Node.js
+
+### 1. Install Node.js Dependencies
 
 ```bash
 npm install
@@ -62,19 +69,84 @@ GOOGLE_SAFE_BROWSING_API_KEY=your_api_key_here
 TWILIO_ACCOUNT_SID=your_sid_here
 TWILIO_AUTH_TOKEN=your_token_here
 OPENAI_API_KEY=your_api_key_here
+XGBOOST_API_URL=http://localhost:5000
 ```
 
-### 3. Start Server
+### 3. Setup Python ML Model (XGBoost)
 
 ```bash
-# Development mode (auto-restart)
-npm run dev
+# Navigate to ML model directory
+cd lumos_XGBoost
 
-# Production mode
-npm start
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+# Windows CMD:
+.\.venv\Scripts\activate.bat
+# macOS/Linux:
+source .venv/bin/activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Return to project root
+cd ..
 ```
 
-Server will run on `http://localhost:3000`
+**Note:** If you encounter scikit-learn version warnings, the model will still work but was trained with version 1.7.2.
+
+### 4. Start Services
+
+**Option A: Start Both Services Simultaneously (Recommended)**
+
+```bash
+npm run start:all
+```
+
+This will start:
+- Node.js API on `http://localhost:3000`
+- Python ML API on `http://localhost:5000`
+
+**Option B: Start Services Separately**
+
+Terminal 1 - Python ML API:
+```bash
+cd lumos_XGBoost
+.\.venv\Scripts\Activate.ps1  # Windows
+python api_server.py
+```
+
+Terminal 2 - Node.js API:
+```bash
+npm run dev
+```
+
+### 5. Open Web Interface
+
+Navigate to `http://localhost:3000` and open `test.html` in your browser.
+
+### 6. Verify Installation
+
+Check if both services are running:
+
+```bash
+# Check Node.js API
+curl http://localhost:3000/api/analyze
+
+# Check Python ML API
+curl http://localhost:5000/health
+```
+
+Expected response from ML API:
+```json
+{
+  "status": "healthy",
+  "model_loaded": true
+}
+```
 
 ## API Documentation
 
@@ -97,29 +169,25 @@ Analyze suspicious messages
 ```json
 {
   "riskLevel": "red",
-  "riskScore": 85,
+  "riskScore": 82,
   "evidence": [
-    "⚠️ URL flagged by Google as Phishing",
-    "⚠️ Phone is VoIP, commonly used in scams",
-    "🤖 AI detected scam indicators",
-    "   Reason: Contains urgency keywords and suspicious link"
+    "🚨 The ML model detected strong scam patterns with 82% probability, indicating a significant risk",
+    "⚠️ The message contains a high number of special characters (28), which can be a tactic used by scammers to create confusion",
+    "⚠️ The average word length (4.67) is slightly unusual for legitimate messages, hinting at potential manipulation"
   ],
   "action": {
     "title": "🚨 High Risk Warning",
     "suggestions": [
-      "Do not click any links",
-      "Do not call back the phone number",
-      "Block this number immediately",
-      "Report to 165 anti-fraud hotline"
+      "Do not click any links in this message",
+      "Do not call back or respond to the sender",
+      "Block this sender immediately",
+      "Report this message to the 165 anti-fraud hotline if necessary"
     ]
-  },
-  "parsed": {
-    "url": "http://suspicious-link.com",
-    "phone": "0912345678",
-    "content": "Your package has arrived, please click..."
   }
 }
 ```
+
+**Note:** With XGBoost ML model integration, the response now includes AI-generated human-readable explanations. The `riskScore` prioritizes the ML model's prediction when available (70% weight), falling back to rule-based scoring if the ML service is unavailable.
 
 #### POST /api/ocr
 
@@ -324,9 +392,25 @@ This will:
 
 ## XGBoost Model Usage
 
-The XGBoost model is a Python-based machine learning model that can predict scam probability based on 45 extracted features.
+The XGBoost model is integrated into the main analysis pipeline and runs automatically when both services are started.
 
-### Setup XGBoost Model
+### Architecture
+
+```
+User Request → Node.js API (Port 3000)
+                ↓
+    Extract 45 Features (parser, APIs, AI)
+                ↓
+    Python ML API (Port 5000) → XGBoost Model
+                ↓
+    Scam Probability + Top Factors
+                ↓
+    AI Explainer (OpenAI) → Human-readable Report
+                ↓
+    JSON Response → Frontend
+```
+
+### Manual Setup (If Not Using `npm run start:all`)
 
 1. **Navigate to the model directory**:
 
@@ -334,19 +418,31 @@ The XGBoost model is a Python-based machine learning model that can predict scam
 cd lumos_XGBoost
 ```
 
-1. **Install Python dependencies**:
+2. **Create and activate virtual environment**:
+
+```bash
+# Create venv
+python -m venv .venv
+
+# Activate (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# Activate (macOS/Linux)
+source .venv/bin/activate
+```
+
+3. **Install Python dependencies**:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-1. **Train the model** (optional, model is pre-trained):
+**Common Issues:**
+- If using Python 3.13, you may see scikit-learn version warnings (model trained with 1.7.2, runs with 1.6.1)
+- The model will still work despite warnings
+- For production, consider retraining with matching scikit-learn version
 
-```bash
-python train_model.py
-```
-
-1. **Start the Flask API server**:
+4. **Start the Flask API server**:
 
 ```bash
 python api_server.py
@@ -360,6 +456,14 @@ The API will run on `http://localhost:5000`
 
 ```http
 GET http://localhost:5000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "model_loaded": true
+}
 ```
 
 #### Predict Scam Probability
@@ -383,9 +487,28 @@ Content-Type: application/json
 
 ```json
 {
-  "scam_probability": 0.87,
-  "is_scam": true,
-  "confidence": "high"
+  "success": true,
+  "result": {
+    "is_scam": true,
+    "scam_probability": 0.87,
+    "normal_probability": 0.13,
+    "confidence": "High",
+    "prediction_label": "Scam",
+    "top_scam_factors": [
+      {
+        "feature": "urgency_level",
+        "value": 8.0,
+        "importance": 0.085,
+        "contribution_score": 0.68
+      },
+      {
+        "feature": "url_is_shortened",
+        "value": 1.0,
+        "importance": 0.072,
+        "contribution_score": 0.072
+      }
+    ]
+  }
 }
 ```
 
@@ -395,16 +518,22 @@ Content-Type: application/json
 GET http://localhost:5000/model/info
 ```
 
-### Integration with Node.js Backend
+### Integration Flow
 
-See `lumos_XGBoost/nodejs_example.js` for integration example. The Node.js backend can:
+The Node.js backend automatically:
 
-1. Extract 45 features using existing services (parser, safeBrowsing, twilioLookup, openaiCheck, featureExtractor)
-2. Send features to XGBoost Flask API at `http://localhost:5000/predict`
-3. Receive scam probability (0-100%) from the model
-4. Combine with existing rule-based risk score for final decision
+1. ✅ Extracts 45 features using existing services
+2. ✅ Calls XGBoost API at `http://localhost:5000/predict`
+3. ✅ Receives scam probability and top contributing factors
+4. ✅ Sends all data to OpenAI for human-readable explanation
+5. ✅ Returns final report to frontend
 
-For detailed integration guide, see `lumos_XGBoost/INTEGRATION_GUIDE.md`
+**Graceful Degradation:** If XGBoost API is unavailable, the system automatically falls back to rule-based scoring.
+
+For detailed integration documentation, see:
+- `lumos_XGBoost/INTEGRATION_GUIDE.md` - Technical integration details
+- `XGBOOST_INTEGRATION.md` - Architecture and workflow
+- `TESTING_PROCEDURE.md` - Step-by-step testing guide
 
 ## Development Tips
 
